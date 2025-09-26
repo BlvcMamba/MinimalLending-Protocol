@@ -85,7 +85,7 @@ __View Functions__
 - Fomula: `totalDeposits - totalBorrow`
 
 
-### Protocol Mechanics
+## Protocol Mechanics
 
 __Interest Calculation__
 
@@ -96,3 +96,34 @@ interestAccrued = (borrowed * annualRate * timeElapsed) / (100 * secondsPerYear)
 ```
 
 Interest is updated whenever a user interacts with the protocol through `_updateInterest()`
+
+### Health Factor
+
+A user's health is measured by their collateralization ratio:
+- If greater than(CR > 150): 150% can borrow more
+- 120% -150%: Healthy but cannot borrow more.
+- If lesser than < 120%(CR < 120): Liquidatable positions
+
+
+### Liquidation Process
+
+1. Anyone can liquidate positions with health factor < 100%
+2. Liquidator pays the full debt amount
+3. Liquidator receives collateral + 10% penalty
+4. User's position is completely cleared.
+
+
+### User Account Structure
+
+```solidity
+
+struct UserAccount {
+    uint256 deposited;   //The collateral that was deposited
+    uint256 borrowed;    // The amount borrowed excluding (accrued interest)
+    uint256 lastUpdatedTime;  //The last Interest calculation timestamp
+}
+```
+
+
+### Security
+

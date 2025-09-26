@@ -126,4 +126,45 @@ struct UserAccount {
 
 
 ### Security
+This protocol is built for educational purposes and contains several potential vulnerabilities and its therefore not advisable for anyone to fork and use for any production code.
+It will mostly contain bugs and would have unit test that confirms these kind of bugs.
 
+1. __Single Token Risk__: No price oracle means no protection against token volatility
+2. __Interest Rate Model__ : Fixed 10% rate regardless of utilization
+3. __Liquidation Mechanics__ : Full liquidation only, no partial Liquidation
+4. __Flashloan Attacks__: No protection against same transaction exploit
+5. __Precision Issues__ : Potential Rounding error in calculations
+
+
+### 🛠️ Development Setup
+__Prerequisites__
+
+- [Foundry](https://getfoundry.sh/)
+- [OpenZeppelin Contracts](https://docs.openzeppelin.com/contracts/)
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/BlvcMamba/MinimalLending-Protocol
+cd MinimalLendingProtocol
+
+# Install dependencies
+forge install OpenZeppelin/openzeppelin-contracts
+
+# Run tests
+forge test
+
+# Run specific test
+forge test --match-test testDeposit_Success
+```
+
+### Project Structure
+
+```
+src/
+├── SimpleLendingProtocol.sol    # Main protocol contract
+test/
+├── SimpleLendingProtocol.t.sol  # Comprehensive test suite
+├── SecurityTests.sol            # Vulnerability testing
+```

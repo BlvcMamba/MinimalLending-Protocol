@@ -79,7 +79,7 @@ __View Functions__
 - INterest compounds continously based on time elapsed.
 
 
-`getAvailableLiquidity()
+`getAvailableLiquidity()`
 
 - Returna available for borrowing.
 - Fomula: `totalDeposits - totalBorrow`

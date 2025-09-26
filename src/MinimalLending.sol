@@ -35,6 +35,11 @@ contract MininmalLending is ReentrancyGuard {
     error InsufficientDeposit();
     error CollateralRatioBroken();
     error TransferFailed();
+    error InsufficientLiquidity();
+    error RepayAmountExceeded();
+    error CantLiquidate();
+    error HealthyPosition();
+    error NotEnoughCollateral();
 
     constructor (address _underlying_token) {
         underlying_token = IERC20(_underlying_token);
@@ -73,6 +78,64 @@ contract MininmalLending is ReentrancyGuard {
         emit Withdraw(msg.sender, amount);
 
 
+    }
+
+    function borrow(uint256 _amount2borrow) external nonReentrant {
+        require(_amount2borrow > 0, NotEnoughAmount());
+        //The getAvailableLiquidity is still under work
+        require(_amount2borrow <= getAvailableLiquidity(), InsufficientLiquidity());
+        _updateInterest(msg.sender);
+
+        UserAccount storage account = userAccounts[msg.sender];
+        uint256 newBorrowed = account.borrowed + amount;
+
+        require(isHealthyPosition(account.deposited, newBorrowed), CollateralRatioBroken());
+        account.borrowed = newBorrowed;
+        totalBorrows += _amount2borrow;
+
+        require(token.transfer(msg.sender, _amount2borrow), TransferFailed());
+        emit Borrowed(msg.sender, _amount2borrow);
+
+    }
+
+    function repay(uint256 _amount) external nonReentrant {
+        require(_amount > 0, NotEnoughAmount());
+        _updateInterest(msg.sender);
+        UserAccount storage account = userAccounts[msg.sender];
+
+        require(account.borrowed >= _amount, RepayAmountExceeded());
+
+        account.borrowed -= _amount;
+        totalBorrows -= _amount;
+
+        require(token.transferFrom(msg.sender, address(this), _amount), TransferFailed());
+        emit Repay(msg.sender, _amount);
+    }
+
+    function liquidate(address user) external nonReentrant {
+        _updateInterest(user);
+        UserAccount storage account = userAccounts[msg.sender];
+        require(amount.borrowed > 0, CantLiquidate());
+
+        //Still not written the getHealthFator()
+        uint256 healthFactor = getHealthFactor(user);
+        require(healthFactor < 100, HealthyPosition());
+
+        uint256 debtToLiquidate = amount.borrowed;
+        uint256 collateralToSeize = (debtToLiquidate * (100 + LIQUIDATION_PENALTY)) / 100;
+        
+        require(collateralToSeize =< amount.deposited, NotEnoughCollateral());
+
+        amount.borrowed = 0;
+        account.deposited -= collateralToSeize;
+        totalBorrows -= debtToLiquidate;
+        totalDeposit -= collateralToSeize;
+
+        require(underlying_token.transferFrom(msg.sender, address(this), debtToLiquidate), TransferFailed());
+
+        require (underlying_token.transfer(msg.sender, collateralToSeize), TransferFailed());
+
+        emit Liquidate(msg.sender, user, collateralToSeize);
     }
 
 

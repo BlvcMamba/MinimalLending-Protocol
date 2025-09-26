@@ -18,3 +18,31 @@ The Minimal lending protocol allows users to:
 - **Liquidation Mechanism** : Positions become liquidatable below 120% collateral ratio.
 
 ## key Parameters
+
+| Parameter | Value | Description |
+|-----------|--------|-------------|
+| **Collateral Ratio** | 150% | Required collateral to debt ratio for borrowing |
+| **Liquidation Threshold** | 120% | Health ratio below which positions can be liquidated |
+| **Annual Interest Rate** | 10% | Interest charged on borrowed amounts |
+| **Liquidation Penalty** | 10% | Bonus for liquidators |
+
+### Core Functions
+
+__User Operations__
+
+`deposit(uint256 amount)`
+
+- Deposit tokens as collateral 
+- Updates user's deposited balance
+- Requires token approval
+
+`withdraw(uint256 amount)`
+
+- Withdraw deposited tokens
+- Validates that the withdrawal maintains healthy collateral ratio.
+- Fails if a user has insufficient deposits or would break collateralization.
+
+`borrow`(uint256 amount)`
+`repay(uint256 amount)`
+`liquidate(address user)`
+

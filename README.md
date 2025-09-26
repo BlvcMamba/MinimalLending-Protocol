@@ -43,6 +43,56 @@ __User Operations__
 - Fails if a user has insufficient deposits or would break collateralization.
 
 `borrow`(uint256 amount)`
+
+- Borrows tokens against deposited collateral 
+- Requires maintaining the 150% collateral ratio.'
+- Limited by available protocol liquidity
+- Start accruing interest immediately
+
 `repay(uint256 amount)`
+
+- Repay borrowed tokens plus accrued interests.
+- Reduces user's debt balances
+- Must not exceed current debt amount.
+
+
 `liquidate(address user)`
 
+- Liquidates undercollaterized positions (health factor < 100%)
+- Liquidator pays the user's debt
+- Receives user's collateral plus 10% penalty
+- Completely clears the user's position
+
+
+__View Functions__
+
+`getHealthFactor(address user)`
+
+- Returns user's collateralization ratio as percentage
+- Formula: `(deposited * 100)/ cuurentDebt`
+- Values below 100%% shows that a position is liquidatable 
+
+
+`getCuurentDebt(address user)`
+
+- Returns user's total debt including aacrued interest
+- INterest compounds continously based on time elapsed.
+
+
+`getAvailableLiquidity()
+
+- Returna available for borrowing.
+- Fomula: `totalDeposits - totalBorrow`
+
+
+### Protocol Mechanics
+
+__Interest Calculation__
+
+Interest accrues continuously using the formula:
+
+```
+interestAccrued = (borrowed * annualRate * timeElapsed) / (100 * secondsPerYear)
+```
+
+Interest is updated whenever a user interacts with the protocol through `_updateInterest()`

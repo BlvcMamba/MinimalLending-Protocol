@@ -138,6 +138,60 @@ contract MininmalLending is ReentrancyGuard {
         emit Liquidate(msg.sender, user, collateralToSeize);
     }
 
+    function getAvailableLiquidity() public view returns (uint256) {
+        return totalDeposits - totalBorrows;
+    }
+
+    function getHealthFactor(address user) public view returns (uint256) {
+        UserAccount storage account = userAccounts[msg.sender];
+
+        //No debt means infinite health
+        if (account.borrowed == 0) return type(uint256).max;
+
+        //calculate the current health including interest accrued
+        uint256 currentDebt = _calculateCurrentDebt(user);
+
+        return (account.deposited * 100) / currentDebt;
+
+    }
+
+    function getCurrentDebt(address user) external view returns (uint256) {
+        return _calculateCurrentDebt(user);
+    }
+
+    function _isHealthyPosition(uint256 depositedAmount, uint256 borrowedAmount) internal pure returns (bool) {
+        if (borrowedAmount == 0) return true;
+        return (depositAmount * 100) >= (borrowedAmount * COLLATERAL_RATIO);
+    }
+
+    function _updateInterest(address user) internal {
+        UserAccount storage account = userAccounts[msg.sender];
+
+        if (account.borrowed > 0 && account.lastUpdatedTime > 0) {
+            uint256 timeElapsed = block.timestamp - account.lastUpdatedTime;
+            uint256 interestAccrued = (account.borrowed * ANNUAL_INTEREST_RATE * timeElapsed) / (100 / SECOND_PER_YEAR);
+
+            account.borrowed += interestAccrued;
+            totalBorrows += interestAccrued; 
+        }
+
+        account.lastUpdatedTime = block.timestamp;
+    }
+
+
+    function _calculateCurrentDebt(address user) internal view returns (uint256) {
+        UserAccount storage account = userAccounts[msg.sender];
+
+        if (account.borrowed == 0 || account.lastUpdatedTime == 0) {
+            return account.borrowed;
+        } 
+
+        uint256 timeElapsed = block.timestamp - account.lastUpdatedTime;
+        uint256 interestAccrued = (account.borrowed * ANNUAL_INTEREST_RATE * timeElapsed) / (100 / SECOND_PER_YEAR);
+
+        return account.borrowed + interestAccrued;
+    }
+
 
 
 }

@@ -64,7 +64,7 @@ contract LendingProtocolTest is Test {
         MLprotocol.deposit(depositAmount);
 
         //check the user account updated 
-        (uint256 deposited, uint256 borrowed, uint256 lastUpdate) = protocol.userAccounts(alice);
+        (uint256 deposited, uint256 borrowed, uint256 lastUpdate) = MLprotocol.userAccounts(alice);
         assertEq(deposited, depositAmount);
         assertEq(borroed, 0);
         assertEq(lastUpdate, block.timestamp);
@@ -113,7 +113,7 @@ contract LendingProtocolTest is Test {
         MLprotocol.withdraw(withdrawAmount);
 
         //check user account updated
-        (uint256 deposited, ,) = protocol.userAccounts(alice);
+        (uint256 deposited, ,) = MLprotocol.userAccounts(alice);
         assertEq(deposited, depositAmount - withdrawAmount);
 
         //check token balances
@@ -134,4 +134,56 @@ contract LendingProtocolTest is Test {
         MLprotocol.withdraw(withdrawAmount);
 
     }
+
+    function testWithdrawal_WhenWouldBreakCollateralRatio() public {
+        uint256 depositAmount = 1500 * 1e18;
+        uint256 borrowAmount = 1000 * 1e18; //borrow ax allowed
+        uint256 withdrawAmount = 100 * 1e18;  //would break collateral ratio
+
+        vm.startPrank(alice);
+        vm.deposit(depositAmount);
+        MLprotocol.borrow(borrowAmount);
+        
+        vm.expectRevert("Would break collateral Ratio");
+        MLprotocol.withdraw(withdrawAmount);
+        vm.stopPrank();
+    }
+
+    //======FUNCTION BORROW TEST====
+    function testBorrow_success() public {
+        uint256 depositAmount = 1500 * 1e18;
+        uint256 borrowAmount = 1000 * 1e18; //within collateral Ratio
+
+        //alice deposit and bob borrows
+
+        vm.prank(alice);
+        MLprotocol.deposit(depositAmount);
+
+        uint256 bobBalanceBefore = token.balanceOf(bob);
+
+        vm.prank(bob);
+        MLprotocol.borrow(borrowAmount);
+
+        //check user accounts
+        (, uint256 borrowed, uint256 lastUpdate) = MLprotocol.userAccounts(bob);
+        assertEq(borrowed, borrowAmount);
+        assertEq(lastUpdate, block.timestamp);
+
+        //check token balance
+
+        assertEq(token.balanceOf(bob), bobBalanceBefore + borrowAmount);
+        assertEq(MLprotocol.totalBorrows(), borrowAmount);
+    }
+
+    function testBorrow_RevertOnInSufficientLiquidity() public {
+        uint256 borrowAmount = 1000 * 1e18;
+        //No deposit in protocol means no liquidity
+
+        vm.prank(alice);
+        vm.expectRevert("Insufficient liquidity");
+        MLprotocol.borrow(borrowAmount);
+    }
+
+    //===TEST REPAY FUNCTION ===
+
 }

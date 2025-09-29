@@ -287,6 +287,91 @@ contract LendingProtocolTest is Test {
 
         //AFTER deposit
         vm.prank(alice);
+        MLprotocol.deposit(depositAmount);
+        assertEq(MLprotocol.getAvailableLiquidity(), depositAmount);
+
+
+        //After deposit
+        vm.prank(bob);
+        MLprotocol.borrow(borrowAmount);
+        assertEq(MLprotocol.getAvailableLiquidity(), depositAmount - borrowAmount);
+
+    }
+
+    function testHealthFactor() public {
+        uint256 depositAmount = 1500 * 1e18;
+        uint256 borrowAmount = 1000 * 1e18;
+
+        //Before borrowing should be max
+        assertEq(MLprotocol.getHealthFactor(), type(uint256).max);
+
+        vm.prank(alice);
+        MLprotocol.deposit(depositAmount);
+
+        vm.prank(bob);
+        MLprotocol.borroq(borrowAmount);
+
+
+        //Health Factor should be 150% (1500/1000) * 100
+        assertEq(MLprotocol.getHealthFactor(alice), 150);
+    }
+
+    //===========TEST INTEREST ACCRUAL ============
+
+    function testInterestAccrual() public {
+        uint256 depositAmount = 1500 * 1e18;
+        uint256 borrowAmount = 1000 * 1e18;
+
+        vm.prank(alice);
+        MLprotocol.deposit(depositAmount);
+
+        vm.prank(bob);
+        MLprotocol.borrow(borrowedAmount);
+
+        uint256 debtBefore = MLprotocol.getCurrentDebt(alice);
+
+        //Move forward 1year
+        vm.warp(block.timestamp + 365 days);
+        uint256 debtAfter = MLprotocol.getCurrentDebt(alice);
+
+        //Debt should have already be increased by ~10%(annual interest rate)
+        uint256 expectedInterest = (borrowAmount * 10) / 100; //10 percent of 1000
+        assertApproxEqAbs(debtAfter, debtBefore + expectedInterest, 1e15); //Allowing small rounding error;
+
+
+    }
+
+    //=============== INTEGRATION TEST ======================
+    function testCompleteUserJourney() public {
+        uint256 depositAmount = 2000 * 1e18;
+        uint256 borrowAmount = 1000 * 1e18;
+        uint256 repayAmount = 500 * 1e18;
+        uint256 withdrawAmount = 500 * 1e18;
+
+        //Alce deposits
+        vm.prank(alice);
+        MLprotocol.deposit(depositAmount);
+
+        //Alice Borrows
+        vm.prank(alice);
+        MLprotocol.borrow(borrowAmount);
+
+        //checking health factor
+        assertEq(MLprotocol.getHealthFactor(alice), 200); //2000/1000 *100
+
+        //Alice Repays part of the debt;
+        vm.prank(alice);
+        MLprotocol.repay(repayAmount);
+
+
+        //Alice then withdraw some collateral
+        vm.prank(alice);
+        MLprotocol.withdraw(withdrawAmount);
+
+        //verifying final state
+        (uint256 finalDeposited, uint256 finalBorrowed) = MLprotocol.userAccounts(alice);
+        assertEq(finalDeposited, depositAmount - withdrawAmount);
+        assertEq(finalBorrowed, borrowAmount - repayAmount);
 
     }
 }

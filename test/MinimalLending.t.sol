@@ -186,4 +186,45 @@ contract LendingProtocolTest is Test {
 
     //===TEST REPAY FUNCTION ===
 
+    function testRepay_success() public {
+        uint256 depositAmount = 1500 * 1e18;
+        uint256 borrowAmount = 1000 * 1e18;
+        uint256 repayAmount = 500 * 1e18;
+
+        //set up bob borrow position 
+
+        vm.prank(alice);
+        MLprotocol.deposit(depositAmount);
+
+        vm.prank(bob);
+        MLprotocol.borrow(borrowAmount);
+
+        //repay part of the debt
+        vm.prank(bob);
+        MLprotocol.repay(repayAmount);
+
+        //check user account
+        (, uint256 borrowed, ) = MLprotocol.userAccounts(bob);
+        assertEq(borrowed, borrowAmount - repayAmount);
+        assertEq(MLprotocol.totalBorrows(), borrowAmount - repayAmount);
+    }
+
+    function testRepay_RevertOnExcessiveAmount() public {
+        uint256 depositAmount = 1500 * 1e18;
+        uint256 borrowAmount = 500 * 1e18;
+        uint256 repayAmount = 1000 * 1e18; //more than amount borrowed
+
+        vm.prank(alice);
+        MLprotocol.deposit(depositAmount);
+
+        vm.prank(bob);
+        MLprotocol.borrow(borrowAmount);
+
+        vm.prank(bob);
+        vm.expectRevert("Repay Amount exceeds debt");
+        MLprotocol.repay(repayAmount);
+    }
+
+    // ====== LIQUIDATION FUNCTION TEST =====
+    
 }

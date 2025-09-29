@@ -4,7 +4,7 @@ pragma solidity ^0.8.29;
 
 import "forge-std/Test.sol";
 import "../src/MinimalLending.sol";
-import "openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 
 contract MinimalLendingToken is ERC20 {
@@ -31,9 +31,9 @@ contract LendingProtocolTest is Test {
     uint256 constant INITIAL_BALANCE = 10000 * 1e18; //10 thousands token
 
 
-    function SetUp() public {
+    function setUp() public {
         token = new MinimalLendingToken();
-        MLprotocol = new MinimalLending();
+        MLprotocol = new MinimalLending(address(token));
 
         //Give test users some tokens
 
@@ -44,13 +44,13 @@ contract LendingProtocolTest is Test {
         //approve protocol to spend tokens for all users
 
         vm.prank(alice);
-        token.approve(address(protoco), type(uint256).max);
+        token.approve(address(MLprotocol), type(uint256).max);
         
         vm.prank(bob);
-        token.approve(address(protocol), type(uint256).max);
+        token.approve(address(MLprotocol), type(uint256).max);
 
         vm.prank(blvcmamba);
-        token.approve(address(protocol), type(uint256).max);
+        token.approve(address(MLprotocol), type(uint256).max);
     }
 
 
@@ -58,7 +58,7 @@ contract LendingProtocolTest is Test {
 
     function testDeposit_success() public {
         uint256 depositAmount = 1000 * 1e18;
-        uint256 aliceBalanceBefore = token.balance(alice);
+        uint256 aliceBalanceBefore = token.balanceOf(alice);
 
         vm.prank(alice);
         MLprotocol.deposit(depositAmount);
@@ -66,7 +66,7 @@ contract LendingProtocolTest is Test {
         //check the user account updated 
         (uint256 deposited, uint256 borrowed, uint256 lastUpdate) = MLprotocol.userAccounts(alice);
         assertEq(deposited, depositAmount);
-        assertEq(borroed, 0);
+        assertEq(borrowed, 0);
         assertEq(lastUpdate, block.timestamp);
 
         //check token balance
@@ -75,14 +75,14 @@ contract LendingProtocolTest is Test {
 
         //check the protoco; state
 
-        assertEq(MLprotocol.totalDeposit(), depositAmount);
+        assertEq(MLprotocol.totalDeposits(), depositAmount);
     }
 
     function testDposit_EmitEvents() public {
         uint256 depositAmount = 1000 * 1e18;
         vm.expectEmit(true, false, false, true);
 
-        emit MinimalLending.deposit(alice, depositAmount);
+        emit MinimalLending.Deposit(alice, depositAmount);
 
         vm.prank(alice);
         MLprotocol.deposit(depositAmount);
@@ -91,7 +91,7 @@ contract LendingProtocolTest is Test {
     function testDeposit_RevertOnZeroAmount() public {
         vm.prank(alice);
         vm.expectRevert("Amount must be greater than 0");
-        protocol.deposit(0);
+        MLprotocol.deposit(0);
     }
 
     function testDeposit_RevertOnInsufficientBalance() public {
@@ -99,7 +99,7 @@ contract LendingProtocolTest is Test {
 
         vm.prank(alice);
         vm.expectRevert("ERC20: Transfer amount exceed balance");
-        protocol.deposit(excessiveAmount);
+        MLprotocol.deposit(excessiveAmount);
     }
 
     //======TEST WITHDRAWAL ======
@@ -110,6 +110,12 @@ contract LendingProtocolTest is Test {
 
         //first deposit
         vm.prank(alice);
+        MLprotocol.deposit(depositAmount);
+
+        uint256 aliceBalanceBefore = token.balanceOf(alice);
+
+        //then withdraw
+        vm.prank(alice);
         MLprotocol.withdraw(withdrawAmount);
 
         //check user account updated
@@ -119,7 +125,7 @@ contract LendingProtocolTest is Test {
         //check token balances
 
         assertEq(token.balanceOf(alice), aliceBalanceBefore - withdrawAmount);
-        assertEq(MLprotocol.totalDeposit(), depositAmount - withdrawAmount);
+        assertEq(MLprotocol.totalDeposits(), depositAmount - withdrawAmount);
     }
 
     function testWithdrawal_RevertsOnInsufficientDeposits() public {
@@ -141,7 +147,7 @@ contract LendingProtocolTest is Test {
         uint256 withdrawAmount = 100 * 1e18;  //would break collateral ratio
 
         vm.startPrank(alice);
-        vm.deposit(depositAmount);
+        MLprotocol.deposit(depositAmount);
         MLprotocol.borrow(borrowAmount);
         
         vm.expectRevert("Would break collateral Ratio");
@@ -303,13 +309,13 @@ contract LendingProtocolTest is Test {
         uint256 borrowAmount = 1000 * 1e18;
 
         //Before borrowing should be max
-        assertEq(MLprotocol.getHealthFactor(), type(uint256).max);
+        assertEq(MLprotocol.getHealthFactor(alice), type(uint256).max);
 
         vm.prank(alice);
         MLprotocol.deposit(depositAmount);
 
         vm.prank(bob);
-        MLprotocol.borroq(borrowAmount);
+        MLprotocol.borrow(borrowAmount);
 
 
         //Health Factor should be 150% (1500/1000) * 100
@@ -326,7 +332,7 @@ contract LendingProtocolTest is Test {
         MLprotocol.deposit(depositAmount);
 
         vm.prank(bob);
-        MLprotocol.borrow(borrowedAmount);
+        MLprotocol.borrow(borrowAmount);
 
         uint256 debtBefore = MLprotocol.getCurrentDebt(alice);
 
@@ -369,7 +375,7 @@ contract LendingProtocolTest is Test {
         MLprotocol.withdraw(withdrawAmount);
 
         //verifying final state
-        (uint256 finalDeposited, uint256 finalBorrowed) = MLprotocol.userAccounts(alice);
+        (uint256 finalDeposited, uint256 finalBorrowed, ) = MLprotocol.userAccounts(alice);
         assertEq(finalDeposited, depositAmount - withdrawAmount);
         assertEq(finalBorrowed, borrowAmount - repayAmount);
 

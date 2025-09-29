@@ -168,3 +168,4 @@ test/
 ├── SimpleLendingProtocol.t.sol  # Comprehensive test suite
 ├── SecurityTests.sol            # Vulnerability testing
 ```
+PS: For anyone trying to fork this and use it as a learning tool, Note that the openzeppelin contract library used is v4.9.3

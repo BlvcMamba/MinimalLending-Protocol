@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
-import "openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract MininmalLending is ReentrancyGuard {
+contract MinimalLending is ReentrancyGuard {
 
     struct UserAccount {
         uint256 deposited;
@@ -22,7 +22,7 @@ contract MininmalLending is ReentrancyGuard {
     uint256 public totalDeposits;
     uint256 public totalBorrows;
 
-    mapping (address user => UserAccount account) userAccounts;
+    mapping (address user => UserAccount account) public userAccounts;
 
     event Deposit(address indexed user, uint256 amount);
     event Withdraw(address indexed user, uint256 amount);
@@ -48,34 +48,34 @@ contract MininmalLending is ReentrancyGuard {
     function deposit(uint256 _amount) external nonReentrant {
         require(_amount > 0, NotEnoughAmount());
 
-        updateInterestRate(); //The function is yet to be built
-        userAccounts[msg.sender].deposit += _amount;
+        _updateInterest(msg.sender); //The function is yet to be built
+        userAccounts[msg.sender].deposited += _amount;
         totalDeposits += _amount;
 
-        require(token.transferFrom(msg,sender, address(this), _amount));
+        require(underlying_token.transferFrom(msg.sender, address(this), _amount));
 
         emit Deposit(msg.sender, _amount);
     }
 
     function withdraw(uint256 _amount) external nonReentrant {
-        require(_amount > 0, NotEnoughWithdrawableAmount);
+        require(_amount > 0, NotEnoughWithdrawableAmount());
 
-        _updateInterestRate(msg.sender); //still under construction
+        _updateInterest(msg.sender); //still under construction
 
         UserAccount storage account = userAccounts[msg.sender];
         require(account.deposited >= _amount, InsufficientDeposit());
 
         //check if withdrawL mainatains healthy collateral ratio
-        uint256 newDeposited = account.deposit - _amount;
+        uint256 newDeposited = account.deposited - _amount;
         //Not written the logic of the healthyPossition
-        require(isHealthyPosition(newDeposited, account.borrowed), CollateralRatioBroken());
+        require(_isHealthyPosition(newDeposited, account.borrowed), CollateralRatioBroken());
 
         account.deposited = newDeposited;
         totalDeposits -= _amount;
 
-        require(token.transferFrom(msg.sender, amount), TransferFailed());
+        require(underlying_token.transfer(msg.sender, _amount), TransferFailed());
 
-        emit Withdraw(msg.sender, amount);
+        emit Withdraw(msg.sender, _amount);
 
 
     }
@@ -87,13 +87,13 @@ contract MininmalLending is ReentrancyGuard {
         _updateInterest(msg.sender);
 
         UserAccount storage account = userAccounts[msg.sender];
-        uint256 newBorrowed = account.borrowed + amount;
+        uint256 newBorrowed = account.borrowed + _amount2borrow;
 
-        require(isHealthyPosition(account.deposited, newBorrowed), CollateralRatioBroken());
+        require(_isHealthyPosition(account.deposited, newBorrowed), CollateralRatioBroken());
         account.borrowed = newBorrowed;
         totalBorrows += _amount2borrow;
 
-        require(token.transfer(msg.sender, _amount2borrow), TransferFailed());
+        require(underlying_token.transfer(msg.sender, _amount2borrow), TransferFailed());
         emit Borrowed(msg.sender, _amount2borrow);
 
     }
@@ -108,28 +108,28 @@ contract MininmalLending is ReentrancyGuard {
         account.borrowed -= _amount;
         totalBorrows -= _amount;
 
-        require(token.transferFrom(msg.sender, address(this), _amount), TransferFailed());
+        require(underlying_token.transferFrom(msg.sender, address(this), _amount), TransferFailed());
         emit Repay(msg.sender, _amount);
     }
 
     function liquidate(address user) external nonReentrant {
         _updateInterest(user);
         UserAccount storage account = userAccounts[msg.sender];
-        require(amount.borrowed > 0, CantLiquidate());
+        require(account.borrowed > 0, CantLiquidate());
 
         //Still not written the getHealthFator()
         uint256 healthFactor = getHealthFactor(user);
         require(healthFactor < 100, HealthyPosition());
 
-        uint256 debtToLiquidate = amount.borrowed;
+        uint256 debtToLiquidate = account.borrowed;
         uint256 collateralToSeize = (debtToLiquidate * (100 + LIQUIDATION_PENALTY)) / 100;
         
-        require(collateralToSeize =< amount.deposited, NotEnoughCollateral());
+        require(collateralToSeize <= account.deposited, NotEnoughCollateral());
 
-        amount.borrowed = 0;
+        account.borrowed = 0;
         account.deposited -= collateralToSeize;
         totalBorrows -= debtToLiquidate;
-        totalDeposit -= collateralToSeize;
+        totalDeposits -= collateralToSeize;
 
         require(underlying_token.transferFrom(msg.sender, address(this), debtToLiquidate), TransferFailed());
 
@@ -161,9 +161,8 @@ contract MininmalLending is ReentrancyGuard {
 
     function _isHealthyPosition(uint256 depositedAmount, uint256 borrowedAmount) internal pure returns (bool) {
         if (borrowedAmount == 0) return true;
-        return (depositAmount * 100) >= (borrowedAmount * COLLATERAL_RATIO);
+        return (depositedAmount * 100) >= (borrowedAmount * COLLATERAL_RATIO);
     }
-
     function _updateInterest(address user) internal {
         UserAccount storage account = userAccounts[msg.sender];
 
@@ -175,9 +174,8 @@ contract MininmalLending is ReentrancyGuard {
             totalBorrows += interestAccrued; 
         }
 
-        account.lastUpdatedTime = block.timestamp;
+        account.lastUpdatedTime = uint32(block.timestamp);
     }
-
 
     function _calculateCurrentDebt(address user) internal view returns (uint256) {
         UserAccount storage account = userAccounts[msg.sender];

@@ -61,7 +61,7 @@ contract LendingProtocolTest is Test {
         uint256 aliceBalanceBefore = token.balance(alice);
 
         vm.prank(alice);
-        protocol.deposit(depositAmount);
+        MLprotocol.deposit(depositAmount);
 
         //check the user account updated 
         (uint256 deposited, uint256 borrowed, uint256 lastUpdate) = protocol.userAccounts(alice);
@@ -75,6 +75,63 @@ contract LendingProtocolTest is Test {
 
         //check the protoco; state
 
-        assertEq(protocol.totalDeposit(), depositAmount);
+        assertEq(MLprotocol.totalDeposit(), depositAmount);
+    }
+
+    function testDposit_EmitEvents() public {
+        uint256 depositAmount = 1000 * 1e18;
+        vm.expectEmit(true, false, false, true);
+
+        emit MinimalLending.deposit(alice, depositAmount);
+
+        vm.prank(alice);
+        MLprotocol.deposit(depositAmount);
+    }
+
+    function testDeposit_RevertOnZeroAmount() public {
+        vm.prank(alice);
+        vm.expectRevert("Amount must be greater than 0");
+        protocol.deposit(0);
+    }
+
+    function testDeposit_RevertOnInsufficientBalance() public {
+        uint256 excessiveAmount = INITIAL_BALANCE + 1;
+
+        vm.prank(alice);
+        vm.expectRevert("ERC20: Transfer amount exceed balance");
+        protocol.deposit(excessiveAmount);
+    }
+
+    //======TEST WITHDRAWAL ======
+
+    function testWithdrawal_success() public {
+        uint256 depositAmount = 1000 * 1e18;
+        uint256 withdrawAmount = 500 * 1e18;
+
+        //first deposit
+        vm.prank(alice);
+        MLprotocol.withdraw(withdrawAmount);
+
+        //check user account updated
+        (uint256 deposited, ,) = protocol.userAccounts(alice);
+        assertEq(deposited, depositAmount - withdrawAmount);
+
+        //check token balances
+
+        assertEq(token.balanceOf(alice), aliceBalanceBefore - withdrawAmount);
+        assertEq(MLprotocol.totalDeposit(), depositAmount - withdrawAmount);
+    }
+
+    function testWithdrawal_RevertsOnInsufficientDeposits() public {
+        uint256 depositAmount = 500 * 1e18;
+        uint256 withdrawAmount = 1000 * 1e18; //more than amoun deposited
+
+        vm.prank(alice);
+        MLprotocol.deposit(depositAmount);
+
+        vm.prank(alice);
+        vm.expectRevert("Insufficient Deposit Amount");
+        MLprotocol.withdraw(withdrawAmount);
+
     }
 }

@@ -227,4 +227,66 @@ contract LendingProtocolTest is Test {
 
     // ====== LIQUIDATION FUNCTION TEST =====
     
+    function testLiquidate_success() public {
+        uint256 depositAmount = 1200 * 1e18; //Just above liquidation threshold
+        uint256 borrowAmount = 1000 * 1e18;
+
+        //setup position at liquidation threshold
+        vm.prank(alice);
+        MLprotocol.deposit(depositAmount);
+
+        vm.prank(alice);
+        MLprotocol.borrow(borrowAmount);
+
+        //simulate interest accrual to push below threshold
+        vm.warp(block.timestamp + 365 days); //1year later
+
+        //check position is liquidatable
+        uint256 healthFactor = MLprotocol.getHealthFactor(alice);
+        assertLt(healthFactor, 100);
+
+        uint256 blvcmambaBalanceBefore = token.balanceOf(blvcmamba);
+
+        //blvcmamba liquidates alice
+        vm.prank(blvcmamba);
+
+        MLprotocol.liquidate(alice);
+
+        //check alice's position is cleared
+        (uint256 deposited, uint256 borrowed,) = MLprotocol.userAccounts(alice);
+        assertEq(borrowed, 0);
+        assertEq(deposited, depositAmount); //some collateral to be seozed
+
+        //Check blvcmamba received the liquidated collateral
+        assertEq(token.balanceOf(blvcmamba), blvcmambaBalanceBefore); 
+    }
+
+    function testLiquidate_RevertOnHealthyPosition() public {
+        uint256 depositAmount = 2000 * 1e18; //High collateral
+        uint256 borrowAmount = 1000 * 1e18;
+
+        vm.prank(alice);
+        MLprotocol.deposit(depositAmount);
+
+        vm.prank(alice);
+        MLprotocol.borrow(borrowAmount);
+
+        vm.prank(blvcmamba);
+        vm.expectRevert("Position is Healthy");
+        MLprotocol.liquidate(alice);
+
+    }
+
+    //======== VIEW FUNCTION TEST===========
+    function testGetAvailableLiquidity() public {
+        uint256 depositAmount = 1000 * 1e18;
+        uint256 borrowAmount = 600 * 1e18;
+
+        //Initially no liquidity
+        assertEq(MLprotocol.getAvailableLiquidity(), 0);
+
+        //AFTER deposit
+        vm.prank(alice);
+
+    }
 }

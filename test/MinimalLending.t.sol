@@ -380,4 +380,8 @@ contract LendingProtocolTest is Test {
         assertEq(finalBorrowed, borrowAmount - repayAmount);
 
     }
+
+    function testWithdrawalReentrancy() public {
+        ///more code...
+    }
 }
